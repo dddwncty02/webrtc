@@ -54,6 +54,8 @@ public class JavaAudioDeviceModule implements AudioDeviceModule {
     private AudioAttributes audioAttributes;
     private boolean useLowLatency;
     private boolean enableVolumeLogger;
+    private WebRtcAudioRecord userProvidedAudioInput = null;
+    private WebRtcAudioTrack userProvidedAudioOutput = null;
 
     private Builder(Context context) {
       this.context = context;
@@ -240,6 +242,16 @@ public class JavaAudioDeviceModule implements AudioDeviceModule {
       return this;
     }
 
+    public Builder setAudioInput(WebRtcAudioRecord audioInput) {
+      this.userProvidedAudioInput = audioInput;
+      return this;
+    }
+
+    public Builder setAudioOutput(WebRtcAudioTrack audioOutput) {
+      this.userProvidedAudioOutput = audioOutput;
+      return this;
+    }
+
     /**
      * Construct an AudioDeviceModule based on the supplied arguments. The caller takes ownership
      * and is responsible for calling release().
@@ -272,13 +284,26 @@ public class JavaAudioDeviceModule implements AudioDeviceModule {
       if (executor == null) {
         executor = WebRtcAudioRecord.newDefaultScheduler();
       }
-      final WebRtcAudioRecord audioInput = new WebRtcAudioRecord(context, executor, audioManager,
-          audioSource, audioFormat, audioRecordErrorCallback, audioRecordStateCallback,
-          samplesReadyCallback, audioBufferCallback, useHardwareAcousticEchoCanceler,
-          useHardwareNoiseSuppressor, inputSampleRate, useStereoInput ? 2 : 1);
-      final WebRtcAudioTrack audioOutput =
-          new WebRtcAudioTrack(context, audioManager, audioAttributes, audioTrackErrorCallback,
-              audioTrackStateCallback, playbackSamplesReadyCallback, useLowLatency, enableVolumeLogger);
+
+      final WebRtcAudioRecord audioInput;
+      if (this.userProvidedAudioInput != null) {
+        audioInput = this.userProvidedAudioInput;
+      } else {
+        audioInput = new WebRtcAudioRecord(context, executor, audioManager, audioSource, audioFormat,
+            audioRecordErrorCallback, audioRecordStateCallback, samplesReadyCallback,
+            audioBufferCallback, useHardwareAcousticEchoCanceler, useHardwareNoiseSuppressor,
+            inputSampleRate, useStereoInput ? 2 : 1);
+      }
+
+      final WebRtcAudioTrack audioOutput;
+      if (this.userProvidedAudioOutput != null) {
+        audioOutput = this.userProvidedAudioOutput;
+      } else {
+        audioOutput = new WebRtcAudioTrack(context, audioManager, audioAttributes,
+            audioTrackErrorCallback, audioTrackStateCallback, playbackSamplesReadyCallback,
+            useLowLatency, enableVolumeLogger);
+      }
+
       return new JavaAudioDeviceModule(context, audioManager, audioInput, audioOutput,
           inputSampleRate, outputSampleRate, useStereoInput, useStereoOutput);
     }
