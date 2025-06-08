@@ -722,7 +722,27 @@ ABSL_CONST_INIT thread_local bool mutex_locked = false;
   if (outError) {
     *outError = nil;
   }
-  RTCLog(@"Configuring audio session for WebRTC.");
+  if (self.useManualAudio) {
+    if (self.isAudioEnabled) {
+      RTCLog(@"useManualAudio is YES and isAudioEnabled is YES. "
+             @"Assuming app has configured and activated AVAudioSession.");
+      // We rely on the app to have activated the session.
+      // If !self.session.isActive (or !self.isActive if more reliable),
+      // it's an app-side issue or specific state we don't manage here.
+      // WebRTC will attempt to start its audio units; they might fail if the
+      // session isn't properly set up and active by the app.
+      return YES;
+    } else {
+      RTCLog(@"useManualAudio is YES but isAudioEnabled is NO. "
+             @"WebRTC audio will not be configured or started by configureWebRTCSession.");
+      if (outError) {
+        *outError = [self configurationErrorWithDescription:
+                              @"useManualAudio is YES but isAudioEnabled is NO."];
+      }
+      return NO;
+    }
+  }
+  RTCLog(@"Configuring audio session for WebRTC (useManualAudio is NO).");
 
   // Configure the AVAudioSession and activate it.
   // Provide an error even if there isn't one so we can log it.
@@ -784,10 +804,13 @@ ABSL_CONST_INIT thread_local bool mutex_locked = false;
   if (outError) {
     *outError = nil;
   }
-  RTCLog(@"Unconfiguring audio session for WebRTC.");
-  [self setActive:NO error:outError];
-
-  return YES;
+  if (self.useManualAudio) {
+    RTCLog(@"useManualAudio is YES. WebRTC will not deactivate AVAudioSession. App is responsible.");
+    // Do not call [self setActive:NO]. The app manages activation.
+    return YES;
+  }
+  RTCLog(@"Unconfiguring audio session for WebRTC (useManualAudio is NO).");
+  return [self setActive:NO error:outError];
 }
 
 - (NSError *)configurationErrorWithDescription:(NSString *)description {
